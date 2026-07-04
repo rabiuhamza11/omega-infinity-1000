@@ -1,60 +1,91 @@
 'use client';
+import { useState, useEffect } from 'react';
+import { Cpu, Play, Pause, CheckCircle, AlertCircle, Zap, Activity, ToggleLeft, ToggleRight } from 'lucide-react';
 
-import { useEffect, useState } from 'react';
-import { agentsApi } from '@/lib/api';
-import { Bot, Cpu, Database, Shield, Rocket, FileText, Code, TestTube, GitBranch, Crown } from 'lucide-react';
-
-const agentIcons: Record<string, any> = {
-  EXECUTIVE: Crown, PLANNER: GitBranch, BACKEND: Code, FRONTEND: Cpu,
-  DATABASE: Database, QA: TestTube, SECURITY: Shield, DEVOPS: Rocket,
-  DOCUMENTATION: FileText, DEPLOYMENT: Bot,
-};
+const AGENT_LIST = [
+  { name: 'Architect Agent', type: 'architect', description: 'Designs system architecture and technical specifications', capabilities: ['system-design', 'tech-stack-selection', 'scalability-analysis'], status: 'active', executions: 42, successRate: 95.2, lastRun: '2h ago' },
+  { name: 'Code Generator', type: 'codegen', description: 'Generates full-stack code from specifications', capabilities: ['code-generation', 'refactoring', 'code-review'], status: 'active', executions: 128, successRate: 91.4, lastRun: '15m ago' },
+  { name: 'DevOps Agent', type: 'devops', description: 'Handles CI/CD pipelines, infrastructure, and deployments', capabilities: ['ci-cd-setup', 'docker', 'kubernetes'], status: 'active', executions: 56, successRate: 98.2, lastRun: '1h ago' },
+  { name: 'QA Agent', type: 'qa', description: 'Writes and runs tests, ensures quality', capabilities: ['unit-tests', 'integration-tests', 'e2e-tests'], status: 'active', executions: 89, successRate: 94.1, lastRun: '30m ago' },
+  { name: 'Security Agent', type: 'security', description: 'Audits code for vulnerabilities and security issues', capabilities: ['vulnerability-scan', 'dependency-audit', 'secret-detection'], status: 'active', executions: 34, successRate: 100, lastRun: '3h ago' },
+  { name: 'Documentation Agent', type: 'docs', description: 'Auto-generates documentation from code', capabilities: ['api-docs', 'readme', 'architecture-docs'], status: 'active', executions: 45, successRate: 97.8, lastRun: '5h ago' },
+  { name: 'Database Agent', type: 'database', description: 'Designs schemas, writes migrations, optimizes queries', capabilities: ['schema-design', 'migrations', 'query-optimization'], status: 'active', executions: 28, successRate: 96.4, lastRun: '6h ago' },
+  { name: 'Frontend Agent', type: 'frontend', description: 'Generates UI components and pages', capabilities: ['react-components', 'css', 'responsive-design'], status: 'active', executions: 67, successRate: 92.3, lastRun: '45m ago' },
+  { name: 'API Agent', type: 'api', description: 'Designs and implements REST/GraphQL APIs', capabilities: ['rest-design', 'graphql-schema', 'openapi-spec'], status: 'active', executions: 51, successRate: 95.7, lastRun: '2h ago' },
+  { name: 'Orchestrator', type: 'orchestrator', description: 'Coordinates all agents and manages workflows', capabilities: ['task-routing', 'workflow-management', 'conflict-resolution'], status: 'active', executions: 203, successRate: 98.9, lastRun: 'just now' },
+];
 
 export default function AgentsPage() {
-  const [agents, setAgents] = useState<any[]>([]);
+  const [agents, setAgents] = useState(AGENT_LIST);
 
-  useEffect(() => {
-    agentsApi.list().then(({ data }) => setAgents(data || [])).catch(() => {
-      // Show default agents if API not connected
-      setAgents([
-        { name: 'Executive Agent', type: 'EXECUTIVE', description: 'Coordinates all agents and manages project scope', enabled: true },
-        { name: 'Planner Agent', type: 'PLANNER', description: 'Creates detailed project plans and task breakdowns', enabled: true },
-        { name: 'Backend Agent', type: 'BACKEND', description: 'Generates API routes, services, and models', enabled: true },
-        { name: 'Frontend Agent', type: 'FRONTEND', description: 'Builds components, pages, and UI', enabled: true },
-        { name: 'Database Agent', type: 'DATABASE', description: 'Designs schemas, migrations, and queries', enabled: true },
-        { name: 'QA Agent', type: 'QA', description: 'Generates and runs tests', enabled: true },
-        { name: 'Security Agent', type: 'SECURITY', description: 'Audits code for vulnerabilities', enabled: true },
-        { name: 'DevOps Agent', type: 'DEVOPS', description: 'Sets up CI/CD, Docker, and infrastructure', enabled: true },
-        { name: 'Documentation Agent', type: 'DOCUMENTATION', description: 'Generates README, API docs, and guides', enabled: true },
-        { name: 'Deployment Agent', type: 'DEPLOYMENT', description: 'Handles deployment to Vercel, Render, Docker', enabled: true },
-      ]);
-    });
-  }, []);
+  const toggleAgent = (type: string) => {
+    setAgents((prev) => prev.map((a) =>
+      a.type === type ? { ...a, status: a.status === 'active' ? 'paused' : 'active' } : a
+    ));
+  };
+
+  const totalExecutions = agents.reduce((s, a) => s + a.executions, 0);
+  const avgSuccessRate = agents.reduce((s, a) => s + a.successRate, 0) / agents.length;
+  const activeCount = agents.filter((a) => a.status === 'active').length;
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-1">AI Agents</h1>
-      <p className="text-white/40 mb-6">10 specialized agents working together to build your software</p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold mb-1 flex items-center gap-2"><Cpu size={24} className="text-purple-500" /> AI Agents</h1>
+          <p className="text-white/40">10 specialized agents working for you</p>
+        </div>
+        <button className="btn-primary flex items-center gap-2"><Zap size={18} /> Run All Agents</button>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {agents.map((agent) => {
-          const Icon = agentIcons[agent.type] || Bot;
-          return (
-            <div key={agent.type} className="card hover:border-omega-accent/30 transition cursor-pointer">
-              <div className="flex items-start gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-omega-accent/20 flex items-center justify-center flex-shrink-0">
-                  <Icon size={20} className="text-omega-glow" />
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="card"><div className="text-white/40 text-sm mb-2 flex items-center gap-2"><Activity size={14} /> Active Agents</div><div className="text-2xl font-bold text-green-400">{activeCount}/10</div></div>
+        <div className="card"><div className="text-white/40 text-sm mb-2">Total Executions</div><div className="text-2xl font-bold">{totalExecutions.toLocaleString()}</div></div>
+        <div className="card"><div className="text-white/40 text-sm mb-2">Avg Success Rate</div><div className="text-2xl font-bold text-green-400">{avgSuccessRate.toFixed(1)}%</div></div>
+      </div>
+
+      {/* Agent Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {agents.map((agent) => (
+          <div key={agent.type} className="card hover:bg-white/5 transition">
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center text-purple-400">
+                  <Cpu size={20} />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold">{agent.name}</h3>
-                  <p className="text-xs text-omega-glow">{agent.type}</p>
+                <div>
+                  <div className="font-semibold">{agent.name}</div>
+                  <div className="text-xs text-white/40">{agent.description}</div>
                 </div>
-                <span className={`w-2 h-2 rounded-full ${agent.enabled ? 'bg-green-500' : 'bg-gray-500'}`} />
               </div>
-              <p className="text-sm text-white/40">{agent.description}</p>
+              <button onClick={() => toggleAgent(agent.type)} className="text-white/40 hover:text-white">
+                {agent.status === 'active' ? <ToggleRight size={28} className="text-green-400" /> : <ToggleLeft size={28} />}
+              </button>
             </div>
-          );
-        })}
+
+            {/* Capabilities */}
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {agent.capabilities.map((cap) => (
+                <span key={cap} className="text-xs px-2 py-1 rounded bg-white/5 text-white/50 font-mono">{cap}</span>
+              ))}
+            </div>
+
+            {/* Stats */}
+            <div className="flex items-center justify-between pt-3 border-t border-white/5">
+              <div className="flex items-center gap-4 text-xs">
+                <span className="text-white/40">{agent.executions} runs</span>
+                <span className={agent.successRate >= 95 ? 'text-green-400' : 'text-yellow-400'}>{agent.successRate}% success</span>
+                <span className="text-white/30">{agent.lastRun}</span>
+              </div>
+              {agent.status === 'active' ? (
+                <span className="text-xs flex items-center gap-1 text-green-400"><CheckCircle size={12} /> Active</span>
+              ) : (
+                <span className="text-xs flex items-center gap-1 text-white/30"><AlertCircle size={12} /> Paused</span>
+              )}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
