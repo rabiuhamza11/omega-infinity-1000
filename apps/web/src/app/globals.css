@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body { @apply font-sans; }
+}
+
+@layer components {
+  .card { @apply bg-omega-panel rounded-xl border border-white/5 p-6; }
+  .btn-primary { @apply bg-omega-accent hover:bg-omega-glow text-white px-6 py-3 rounded-lg font-medium transition; }
+  .btn-secondary { @apply bg-white/5 hover:bg-white/10 text-white px-6 py-3 rounded-lg font-medium border border-white/10 transition; }
+  .input { @apply bg-omega-panel border border-white/10 rounded-lg px-4 py-3 w-full text-white placeholder-white/30 focus:border-omega-accent focus:outline-none; }
+  .nav-item { @apply flex items-center gap-3 px-4 py-3 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition cursor-pointer; }
+  .nav-item.active { @apply text-white bg-omega-accent/10; }
+}

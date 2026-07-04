@@ -1,0 +1,27 @@
+{
+  "name": "omega-infinity-1000",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:api": "cd apps/api && npm run start:dev",
+    "dev:web": "cd apps/web && npm run dev",
+    "build": "npm run build:api && npm run build:web",
+    "build:api": "cd apps/api && npm run build",
+    "build:web": "cd apps/web && npm run build",
+    "test": "npm run test:api && npm run test:web",
+    "test:api": "cd apps/api && npm test",
+    "test:web": "cd apps/web && npm test",
+    "db:migrate": "cd prisma && npx prisma migrate dev",
+    "db:generate": "cd prisma && npx prisma generate",
+    "db:seed": "cd prisma && npx prisma db seed",
+    "docker:up": "docker-compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker-compose -f docker/docker-compose.yml down"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "typescript": "^5.3.0",
+    "prisma": "^5.8.0"
+  }
+}
