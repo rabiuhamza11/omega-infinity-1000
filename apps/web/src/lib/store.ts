@@ -1,38 +1,53 @@
+// OMEGA INFINITY Zustand Store
 import { create } from 'zustand';
 
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  role: string;
-}
-
-interface AuthState {
-  user: User | null;
+interface AppState {
+  user: any | null;
   token: string | null;
-  setAuth: (user: User, token: string) => void;
+  isAuthenticated: boolean;
+  currentOrg: any | null;
+  sidebarOpen: boolean;
+  notificationsOpen: boolean;
+  unreadCount: number;
+  activeAgents: number;
+  activeWorkflows: number;
+
+  setUser: (user: any) => void;
+  setToken: (token: string | null) => void;
+  setOrg: (org: any) => void;
   logout: () => void;
-  loadFromStorage: () => void;
+  toggleSidebar: () => void;
+  toggleNotifications: () => void;
+  setUnreadCount: (count: number) => void;
+  setActiveAgents: (count: number) => void;
+  setActiveWorkflows: (count: number) => void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useStore = create<AppState>((set) => ({
   user: null,
-  token: null,
-  setAuth: (user, token) => {
-    localStorage.setItem('omega_token', token);
-    localStorage.setItem('omega_user', JSON.stringify(user));
-    set({ user, token });
+  token: typeof window !== 'undefined' ? localStorage.getItem('omega_token') : null,
+  isAuthenticated: false,
+  currentOrg: null,
+  sidebarOpen: true,
+  notificationsOpen: false,
+  unreadCount: 0,
+  activeAgents: 10,
+  activeWorkflows: 0,
+
+  setUser: (user) => set({ user, isAuthenticated: !!user }),
+  setToken: (token) => {
+    if (token && typeof window !== 'undefined') localStorage.setItem('omega_token', token);
+    else if (typeof window !== 'undefined') localStorage.removeItem('omega_token');
+    set({ token });
   },
+  setOrg: (org) => set({ currentOrg: org }),
   logout: () => {
-    localStorage.removeItem('omega_token');
-    localStorage.removeItem('omega_user');
-    set({ user: null, token: null });
+    if (typeof window !== 'undefined') localStorage.removeItem('omega_token');
+    set({ user: null, token: null, isAuthenticated: false, currentOrg: null });
   },
-  loadFromStorage: () => {
-    const token = localStorage.getItem('omega_token');
-    const userStr = localStorage.getItem('omega_user');
-    if (token && userStr) {
-      set({ token, user: JSON.parse(userStr) });
-    }
-  },
+  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+  toggleNotifications: () => set((state) => ({ notificationsOpen: !state.notificationsOpen })),
+  setUnreadCount: (count) => set({ unreadCount: count }),
+  setActiveAgents: (count) => set({ activeAgents: count }),
+  setActiveWorkflows: (count) => set({ activeWorkflows: count }),
 }));
