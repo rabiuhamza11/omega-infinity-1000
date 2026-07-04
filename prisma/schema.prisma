@@ -1,6 +1,8 @@
+// OMEGA INFINITY 1000 — Prisma Schema (Complete)
+// Enterprise AI orchestration platform database schema
+
 generator client {
   provider = "prisma-client-js"
-  output   = "../node_modules/@prisma/client"
 }
 
 datasource db {
@@ -8,341 +10,205 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ============ AUTH & USERS ============
+// ============ USERS & AUTH ============
 
 model User {
-  id              String   @id @default(uuid())
-  email           String   @unique
-  passwordHash    String?
-  name            String?
-  avatarUrl       String?
-  emailVerified   Boolean  @default(false)
-  emailVerifyToken String? @unique
-  passwordResetToken String? @unique
-  passwordResetExpires DateTime?
-  oauthProvider   String?  // google, github
-  oauthId         String?
-  role            UserRole @default(MEMBER)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id           String     @id @default(cuid())
+  email        String     @unique
+  password     String
+  name         String
+  avatar       String?
+  role         UserRole   @default(DEVELOPER)
+  status       UserStatus @default(ACTIVE)
+  lastLogin    DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
-  memberships     Membership[]
-  projects        Project[]
-  apiKeys         ApiKey[]
-  conversations   Conversation[]
-  auditLogs       AuditLog[]
-  refreshTokens   RefreshToken[]
-
-  @@index([email])
-  @@index([oauthProvider, oauthId])
+  orgMembers   OrgMember[]
+  projects     Project[]  @relation("ProjectOwner")
+  agents       Agent[]
+  workflows    Workflow[]
+  notifications Notification[]
+  auditLogs    AuditLog[]
 }
 
 enum UserRole {
-  SUPER_ADMIN
   ADMIN
-  MEMBER
+  DEVELOPER
   VIEWER
 }
 
-model RefreshToken {
-  id        String   @id @default(uuid())
-  token     String   @unique
-  userId    String
-  expiresAt DateTime
-  revoked   Boolean  @default(false)
-  createdAt DateTime @default(now())
-
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([token])
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
 }
 
 // ============ ORGANIZATIONS ============
 
 model Organization {
-  id          String   @id @default(uuid())
-  name        String
-  slug        String   @unique
+  id          String     @id @default(cuid())
+  name        String     @unique
   description String?
-  logoUrl     String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  logo        String?
+  status      OrgStatus  @default(ACTIVE)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
-  memberships Membership[]
+  ownerId     String
+  owner       User       @relation(fields: [ownerId], references: [id])
+
+  members     OrgMember[]
   projects    Project[]
-  apiKeys     ApiKey[]
-  auditLogs   AuditLog[]
-
-  @@index([slug])
+  agents      Agent[]
+  deployments Deployment[]
 }
 
-model Membership {
-  id              String           @id @default(uuid())
-  userId          String
-  organizationId  String
-  role            OrgRole          @default(MEMBER)
-  status          MembershipStatus @default(PENDING)
-  invitedAt       DateTime         @default(now())
-  joinedAt        DateTime?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime @updatedAt
+model OrgMember {
+  id       String  @id @default(cuid())
+  orgId    String
+  userId   String
+  role     OrgRole @default(DEVELOPER)
+  joinedAt DateTime @default(now())
 
-  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  org      Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, organizationId])
-  @@index([organizationId])
+  @@unique([orgId, userId])
 }
 
-enum OrgRole {
-  OWNER
-  ADMIN
-  MEMBER
-  VIEWER
-}
-
-enum MembershipStatus {
-  PENDING
-  ACTIVE
-  SUSPENDED
-  LEFT
-}
+enum OrgStatus { ACTIVE SUSPENDED }
+enum OrgRole { OWNER ADMIN DEVELOPER VIEWER }
 
 // ============ PROJECTS ============
 
 model Project {
-  id              String        @id @default(uuid())
-  name            String
-  description     String?
-  status          ProjectStatus @default(ACTIVE)
-  organizationId  String?
-  userId          String
-  prompt          String?
-  repositoryUrl   String?
-  deploymentUrl   String?
-  config          Json?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id          String         @id @default(cuid())
+  name        String
+  description String
+  status      ProjectStatus  @default(PLANNING)
+  techStack   String[]
+  progress    Int            @default(0)
+  repoUrl     String?
+  liveUrl     String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
 
-  organization    Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-  user            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tasks           Task[]
-  conversations   Conversation[]
-  deployments     Deployment[]
-  artifacts       Artifact[]
+  ownerId     String
+  owner       User           @relation("ProjectOwner", fields: [ownerId], references: [id])
+  orgId       String?
+  org         Organization?  @relation(fields: [orgId], references: [id])
 
-  @@index([userId])
-  @@index([organizationId])
-  @@index([status])
+  workflows   Workflow[]
+  deployments Deployment[]
 }
 
 enum ProjectStatus {
+  PLANNING
   ACTIVE
+  PAUSED
+  COMPLETED
   ARCHIVED
-  DELETED
-  DEPLOYED
-  BUILDING
-  FAILED
-}
-
-model Artifact {
-  id          String   @id @default(uuid())
-  projectId   String
-  name        String
-  type        String   // file, code, config, doc
-  content     String
-  filePath    String?
-  language    String?
-  createdAt   DateTime @default(now())
-
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
 }
 
 // ============ AI AGENTS ============
 
 model Agent {
-  id           String   @id @default(uuid())
-  name         String
-  type         AgentType
-  description  String?
-  config       Json?
-  enabled      Boolean  @default(true)
-  version      String   @default("1.0.0")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  tasks        Task[]
-
-  @@index([type])
+  id          String     @id @default(cuid())
+  name        String
+  type        AgentType
+  description String
+  capabilities String[]
+  isActive    Boolean    @default(true)
+  config      Json?
+  orgId       String?
+  org         Organization? @relation(fields: [orgId], references: [id])
+  ownerId     String?
+  owner       User?      @relation(fields: [ownerId], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 }
 
 enum AgentType {
-  EXECUTIVE
-  PLANNER
-  BACKEND
-  FRONTEND
-  DATABASE
+  ARCHITECT
+  CODEGEN
+  DEVOPS
   QA
   SECURITY
-  DEVOPS
-  DOCUMENTATION
-  DEPLOYMENT
+  DOCS
+  DATABASE
+  FRONTEND
+  API
+  ORCHESTRATOR
 }
 
-model Task {
-  id           String     @id @default(uuid())
-  projectId    String
-  agentId      String?
-  title        String
-  description  String?
-  status       TaskStatus @default(PENDING)
-  priority     Int        @default(5)
-  input        Json?
-  output       Json?
-  result       String?
-  startedAt    DateTime?
-  completedAt  DateTime?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+// ============ WORKFLOWS ============
 
-  project      Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  agent        Agent?     @relation(fields: [agentId], references: [id], onDelete: SetNull)
-
-  @@index([projectId])
-  @@index([agentId])
-  @@index([status])
+model Workflow {
+  id          String          @id @default(cuid())
+  name        String
+  description String
+  status      WorkflowStatus  @default(PENDING)
+  tasks       Json
+  dependencies Json
+  result      Json?
+  projectId   String?
+  project     Project?        @relation(fields: [projectId], references: [id])
+  userId      String?
+  user        User?           @relation(fields: [userId], references: [id])
+  createdAt   DateTime        @default(now())
+  completedAt DateTime?
 }
 
-enum TaskStatus {
+enum WorkflowStatus {
   PENDING
-  QUEUED
   RUNNING
   COMPLETED
   FAILED
   CANCELLED
 }
 
-// ============ CONVERSATIONS ============
-
-model Conversation {
-  id           String   @id @default(uuid())
-  projectId    String?
-  userId       String
-  title        String?
-  metadata     Json?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  project      Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages     Message[]
-
-  @@index([userId])
-  @@index([projectId])
-}
-
-model Message {
-  id              String    @id @default(uuid())
-  conversationId  String
-  role            MessageRole
-  content         String
-  agentType       AgentType?
-  metadata        Json?
-  tokens          Int?
-  createdAt       DateTime  @default(now())
-
-  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-  @@index([conversationId])
-}
-
-enum MessageRole {
-  USER
-  ASSISTANT
-  SYSTEM
-  AGENT
-}
-
 // ============ DEPLOYMENTS ============
 
 model Deployment {
-  id            String           @id @default(uuid())
-  projectId     String
-  platform      DeployPlatform
-  status        DeployStatus     @default(PENDING)
-  url           String?
-  deploymentId  String?          // external ID from platform
-  config        Json?
-  logs          String?
-  version       String?
-  triggeredBy   String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-
-  project       Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
-
-  @@index([projectId])
-  @@index([status])
+  id           String   @id @default(cuid())
+  environment  String
+  platform     String
+  url          String?
+  status       String   @default("PENDING")
+  version      String
+  logs         String?
+  orgId        String?
+  org          Organization? @relation(fields: [orgId], references: [id])
+  projectId    String?
+  project      Project? @relation(fields: [projectId], references: [id])
+  deployedAt   DateTime @default(now())
 }
 
-enum DeployPlatform {
-  VERCEL
-  RENDER
-  GITHUB_PAGES
-  DOCKER
+// ============ NOTIFICATIONS ============
+
+model Notification {
+  id        String    @id @default(cuid())
+  type      String
+  title     String
+  message   String
+  priority  String    @default("normal")
+  data      Json?
+  read      Boolean   @default(false)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
 }
 
-enum DeployStatus {
-  PENDING
-  BUILDING
-  DEPLOYED
-  FAILED
-  ROLLED_BACK
-}
-
-// ============ API KEYS ============
-
-model ApiKey {
-  id          String   @id @default(uuid())
-  name        String
-  keyHash     String   @unique
-  keyPrefix   String   // first 8 chars for identification
-  userId      String
-  organizationId String?
-  scopes      String[] @default([])
-  lastUsedAt  DateTime?
-  expiresAt   DateTime?
-  createdAt   DateTime @default(now())
-  revokedAt   DateTime?
-
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([keyHash])
-}
-
-// ============ AUDIT LOG ============
+// ============ AUDIT LOGS ============
 
 model AuditLog {
-  id             String   @id @default(uuid())
-  userId         String?
-  organizationId String?
-  action         String   // e.g., "project.create", "user.login"
-  resource       String?  // e.g., "project:123"
-  ipAddress      String?
-  userAgent      String?
-  metadata       Json?
-  createdAt      DateTime @default(now())
-
-  user           User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([organizationId])
-  @@index([action])
-  @@index([createdAt])
+  id        String   @id @default(cuid())
+  action    String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  details   String
+  ipAddress String?
+  metadata  Json?
+  createdAt DateTime @default(now())
 }
