@@ -1,66 +1,94 @@
 'use client';
-
 import { useState, useRef, useEffect } from 'react';
-import { agentsApi } from '@/lib/api';
-import { Send, Bot } from 'lucide-react';
-
-interface Msg { role: string; content: string; agent?: string }
+import { Send, Bot, User, Zap, Cpu, Workflow as WorkflowIcon } from 'lucide-react';
 
 export default function ChatPage() {
-  const [messages, setMessages] = useState<Msg[]>([
-    { role: 'assistant', content: 'Hello! I am the OMEGA AI Orchestrator. Describe the application you want to build and I will coordinate the agents to create it.', agent: 'EXECUTIVE' }
+  const [messages, setMessages] = useState([
+    { role: 'ai', content: 'Welcome to OMEGA INFINITY. I can orchestrate all 10 agents to build, deploy, and manage your projects. What do you want to build?', timestamp: Date.now() },
   ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const endRef = useRef<HTMLDivElement>(null);
+  const chatRef = useRef(null);
 
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  useEffect(() => {
+    chatRef.current?.scrollTo(0, chatRef.current.scrollHeight);
+  }, [messages]);
 
   const send = async () => {
     if (!input.trim()) return;
-    const userMsg = { role: 'user', content: input };
-    setMessages((m) => [...m, userMsg]);
+    const userMsg = { role: 'user', content: input, timestamp: Date.now() };
+    setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setLoading(true);
 
-    try {
-      // In production: call AI orchestrator endpoint
-      setTimeout(() => {
-        setMessages((m) => [...m, {
-          role: 'assistant',
-          content: 'I have analyzed your request. I will coordinate the following agents:\n\n1. PLANNER — Create task breakdown\n2. DATABASE — Design schema\n3. BACKEND — Generate API\n4. FRONTEND — Build UI\n5. QA — Write tests\n6. DEVOPS — Set up CI/CD\n\nShall I proceed?',
-          agent: 'EXECUTIVE'
-        }]);
-        setLoading(false);
-      }, 1500);
-    } catch { setLoading(false); }
+    setTimeout(() => {
+      const responses = {
+        build: `I'll orchestrate a full-stack build for you. Here's the plan:\n\n1. Architect Agent → System design\n2. Database Agent → Schema design\n3. API Agent → REST endpoints\n4. Code Generator → Backend + Frontend\n5. QA Agent → Tests\n6. Security Agent → Vulnerability scan\n7. DevOps Agent → CI/CD pipeline\n8. Docs Agent → Documentation\n\nShall I start the workflow?`,
+        deploy: `Deployment initiated. DevOps Agent is:\n\n1. Building Docker image\n2. Running health checks\n3. Deploying to staging\n4. Running integration tests\n5. Promoting to production\n\nStatus: In progress...`,
+        audit: `Security Agent activated. Scanning for:\n\n1. OWASP Top 10 vulnerabilities\n2. Dependency CVEs\n3. Hardcoded secrets\n4. SQL injection points\n5. XSS attack surfaces\n\nThis will take ~30 seconds. Results will appear in the Security Dashboard.`,
+        default: `I can help you build, deploy, audit, or manage any project. Try:\n\n"Build a REST API with PostgreSQL"\n"Deploy the current project"\n"Run a security audit"\n"Generate documentation"`,
+      };
+
+      const lower = userMsg.content.toLowerCase();
+      let response = responses.default;
+      if (lower.includes('build') || lower.includes('create') || lower.includes('generate')) response = responses.build;
+      else if (lower.includes('deploy')) response = responses.deploy;
+      else if (lower.includes('audit') || lower.includes('security')) response = responses.audit;
+
+      setMessages((prev) => [...prev, { role: 'ai', content: response, timestamp: Date.now() }]);
+      setLoading(false);
+    }, 1500);
   };
 
-  return (
-    <div className="flex flex-col h-[calc(100vh-120px)]">
-      <h1 className="text-2xl font-bold mb-1">AI Chat</h1>
-      <p className="text-white/40 mb-6">Describe your project in natural language</p>
+  const quickActions = ['Build a full-stack app', 'Deploy current project', 'Run security audit', 'Generate documentation'];
 
-      <div className="card flex-1 flex flex-col p-0 overflow-hidden">
-        <div className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.map((m, i) => (
-            <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${m.role === 'user' ? 'bg-omega-accent' : 'bg-white/10'}`}>
-                {m.role === 'user' ? 'U' : <Bot size={16} />}
+  return (
+    <div>
+      <h1 className="text-2xl font-bold mb-1 flex items-center gap-2">
+        <Zap size={24} className="text-purple-500" /> Agent Chat
+      </h1>
+      <p className="text-white/40 mb-6">Talk to the orchestrator — it routes to all 10 agents</p>
+
+      <div className="card flex flex-col" style={{ height: 'calc(100vh - 200px)' }}>
+        <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-4">
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                msg.role === 'user' ? 'bg-tradeos-accent text-black' : 'bg-purple-600 text-white'
+              }`}>
+                {msg.role === 'user' ? <User size={18} /> : <Bot size={18} />}
               </div>
-              <div className={`max-w-[70%] rounded-lg p-4 ${m.role === 'user' ? 'bg-omega-accent text-white' : 'bg-white/5'}`}>
-                {m.agent && <p className="text-xs text-omega-glow mb-1">{m.agent}</p>}
-                <p className="text-sm whitespace-pre-wrap">{m.content}</p>
+              <div className={`max-w-[70%] rounded-xl p-3 whitespace-pre-line ${
+                msg.role === 'user' ? 'bg-purple-500/20 text-white' : 'bg-white/5 text-white/90'
+              }`}>
+                <p className="text-sm">{msg.content}</p>
               </div>
             </div>
           ))}
-          {loading && <div className="text-white/30 text-sm">Agent is thinking...</div>}
-          <div ref={endRef} />
+          {loading && (
+            <div className="flex gap-3">
+              <div className="w-9 h-9 rounded-full bg-purple-600 flex items-center justify-center"><Cpu size={18} /></div>
+              <div className="bg-white/5 rounded-xl p-3 flex gap-1">
+                <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                <div className="w-2 h-2 bg-white/40 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="border-t border-white/5 p-4 flex gap-3">
-          <input className="input flex-1" placeholder="Describe the app you want to build..." value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()} />
-          <button onClick={send} className="btn-primary px-4"><Send size={18} /></button>
+        <div className="px-4 py-2 flex gap-2 flex-wrap border-t border-white/5">
+          {quickActions.map((q) => (
+            <button key={q} onClick={() => setInput(q)} className="px-3 py-1.5 rounded-full text-xs bg-white/5 text-white/60 hover:bg-white/10">
+              {q}
+            </button>
+          ))}
+        </div>
+
+        <div className="p-4 border-t border-white/5 flex gap-2">
+          <input className="input flex-1" placeholder="Tell the orchestrator what to build..." value={input}
+            onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()} />
+          <button onClick={send} className="btn-primary px-4 py-2"><Send size={18} /></button>
         </div>
       </div>
     </div>
