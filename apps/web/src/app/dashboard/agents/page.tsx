@@ -1,6 +1,8 @@
 'use client';
 import { useState } from 'react';
-import { Cpu, Zap, Play, Pause, CheckCircle, Clock, Activity, GitBranch, Code, Shield, Rocket, FileText, Database, Layers } from 'lucide-react';
+import { Cpu, Zap, Play, Pause, CheckCircle, Clock, Activity, GitBranch, Code, Shield, Rocket, FileText, Database, Layers, Loader2 } from 'lucide-react';
+
+const API_BASE = 'https://superagent-2286fb2f.base44.app/functions/omegaInfinityApi';
 
 const agents = [
   { name: 'Orchestrator', role: 'Executive coordination', icon: Layers, color: '#A855F7', status: 'active', tasks: 28, completed: 26, avgTime: '2.4s' },
@@ -17,9 +19,35 @@ const agents = [
 
 export default function AgentsPage() {
   const [agentList, setAgentList] = useState(agents);
+  const [running, setRunning] = useState(false);
+  const [lastRun, setLastRun] = useState<string | null>(null);
 
   const toggleAgent = (name: string) => {
     setAgentList(prev => prev.map(a => a.name === name ? { ...a, status: a.status === 'active' ? 'paused' : 'active' } : a));
+  };
+
+  const runAllAgents = async () => {
+    setRunning(true);
+    setLastRun(null);
+    try {
+      const res = await fetch(`${API_BASE}?action=run_agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const data = await res.json();
+      setAgentList(prev => prev.map(a => ({
+        ...a,
+        status: 'active',
+        tasks: a.tasks + 1,
+        completed: a.completed + 1,
+      })));
+      setLastRun(data.message || 'All agents ran successfully.');
+    } catch (e) {
+      setLastRun('Run failed — please try again.');
+    } finally {
+      setRunning(false);
+    }
   };
 
   const activeCount = agentList.filter(a => a.status === 'active').length;
@@ -34,8 +62,14 @@ export default function AgentsPage() {
           <h1 className="text-2xl font-bold mb-1 flex items-center gap-2"><Cpu size={24} className="text-purple-400" /> AI Agents</h1>
           <p className="text-white/40">10 specialized agents working together</p>
         </div>
-        <button className="btn-primary flex items-center gap-2"><Zap size={18} /> Run All Agents</button>
+        <button className="btn-primary flex items-center gap-2" onClick={runAllAgents} disabled={running}>
+          {running ? <Loader2 size={18} className="animate-spin" /> : <Zap size={18} />} Run All Agents
+        </button>
       </div>
+
+      {lastRun && (
+        <div className="mb-4 px-4 py-2 rounded-lg bg-green-500/10 text-green-400 text-sm">{lastRun}</div>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
