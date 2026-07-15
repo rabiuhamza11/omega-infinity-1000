@@ -1,4 +1,4 @@
-// OMEGA INFINITY 1000 — Prisma Schema
+// OMEGA INFINITY 1000 — Prisma Schema (Complete)
 // Enterprise AI orchestration platform database schema
 
 generator client {
@@ -13,47 +13,57 @@ datasource db {
 // ============ USERS & AUTH ============
 
 model User {
-  id                   String         @id @default(cuid())
-  email                String         @unique
-  passwordHash         String
-  name                 String?
-  avatarUrl            String?
-  role                 String         @default("DEVELOPER")
-  emailVerified        Boolean        @default(false)
-  emailVerifyToken     String?
-  passwordResetToken   String?
+  id                  String     @id @default(cuid())
+  email               String     @unique
+  passwordHash        String
+  name                String
+  avatarUrl           String?
+  role                UserRole   @default(DEVELOPER)
+  status              UserStatus @default(ACTIVE)
+  emailVerified       DateTime?
+  emailVerifyToken    String?    @unique
+  passwordResetToken  String?
   passwordResetExpires DateTime?
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  lastLogin           DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
   memberships   Membership[]
-  projects      Project[]
-  agents        Agent[]
-  deployments   Deployment[]
+  organizations Organization[] @relation("OrgOwner")
+  projects     Project[]
+  agents       Agent[]
+  workflows    Workflow[]
   refreshTokens RefreshToken[]
+  notifications Notification[]
+  auditLogs    AuditLog[]
 }
 
-// ============ REFRESH TOKENS ============
+enum UserRole {
+  ADMIN
+  DEVELOPER
+  VIEWER
+}
 
-model RefreshToken {
-  id        String   @id @default(cuid())
-  token     String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  revoked   Boolean  @default(false)
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  PENDING
 }
 
 // ============ ORGANIZATIONS ============
 
 model Organization {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  slug        String   @unique
+  id          String     @id @default(cuid())
+  name        String     @unique
+  slug        String     @unique
   description String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  logo        String?
+  status      OrgStatus  @default(ACTIVE)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  ownerId     String
+  owner       User       @relation("OrgOwner", fields: [ownerId], references: [id])
 
   memberships Membership[]
   projects    Project[]
@@ -61,32 +71,37 @@ model Organization {
   deployments Deployment[]
 }
 
+model Membership {
+  id             String     @id @default(cuid())
+  organizationId String
+  userId         String
+  role           OrgRole    @default(MEMBER)
+  status         MemberStatus @default(ACTIVE)
+  joinedAt       DateTime   @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+}
+
+enum OrgStatus {
+  ACTIVE
+  SUSPENDED
+}
+
 enum OrgRole {
   OWNER
   ADMIN
+  MEMBER
   DEVELOPER
   VIEWER
-  MEMBER
 }
 
 enum MemberStatus {
   ACTIVE
   PENDING
   SUSPENDED
-}
-
-model Membership {
-  id             String       @id @default(cuid())
-  userId         String
-  organizationId String
-  role           OrgRole      @default(DEVELOPER)
-  status         MemberStatus @default(ACTIVE)
-  joinedAt       DateTime     @default(now())
-
-  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, organizationId])
 }
 
 // ============ PROJECTS ============
@@ -96,7 +111,7 @@ model Project {
   name           String
   description    String
   prompt         String?
-  status         String         @default("PLANNING")
+  status         ProjectStatus  @default(PLANNING)
   techStack      String[]
   progress       Int            @default(0)
   repoUrl        String?
@@ -104,35 +119,57 @@ model Project {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  userId         String
-  user           User           @relation(fields: [userId], references: [id])
-  organizationId String?
-  organization   Organization?  @relation(fields: [organizationId], references: [id])
+  userId          String
+  user            User          @relation(fields: [userId], references: [id])
+  organizationId  String?
+  organization    Organization? @relation(fields: [organizationId], references: [id])
 
-  tasks         Task[]
-  deployments   Deployment[]
-  artifacts     Artifact[]
+  tasks        Task[]
+  workflows    Workflow[]
+  deployments  Deployment[]
+  artifacts    Artifact[]
   conversations Conversation[]
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
 }
 
 // ============ AI AGENTS ============
 
 model Agent {
-  id           String   @id @default(cuid())
-  name         String
-  type         String
-  description  String?
+  id          String     @id @default(cuid())
+  name        String
+  type        AgentType
+  description String
   capabilities String[]
-  enabled      Boolean  @default(true)
-  config       Json?
-  orgId        String?
-  org          Organization? @relation(fields: [orgId], references: [id])
-  userId       String?
-  user         User?         @relation(fields: [userId], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  enabled     Boolean    @default(true)
+  config      Json?
+  organizationId String?
+  org         Organization? @relation(fields: [organizationId], references: [id])
+  userId      String?
+  user        User?      @relation(fields: [userId], references: [id])
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   tasks Task[]
+}
+
+enum AgentType {
+  ARCHITECT
+  CODEGEN
+  DEVOPS
+  QA
+  SECURITY
+  DOCS
+  DATABASE
+  FRONTEND
+  API
+  ORCHESTRATOR
 }
 
 // ============ TASKS ============
@@ -141,39 +178,19 @@ model Task {
   id          String   @id @default(cuid())
   title       String
   description String?
-  projectId   String?
-  project     Project? @relation(fields: [projectId], references: [id])
-  agentId     String?
-  agent       Agent?   @relation(fields: [agentId], references: [id])
-  input       Json?
-  priority    Int      @default(5)
   status      String   @default("QUEUED")
-  startedAt   DateTime?
+  priority    Int      @default(5)
+  input       Json?
   output      Json?
   result      String?
+  projectId   String
+  agentId     String?
+  startedAt   DateTime?
   completedAt DateTime?
   createdAt   DateTime @default(now())
-}
 
-// ============ DEPLOYMENTS ============
-
-model Deployment {
-  id           String          @id @default(cuid())
-  environment  String?
-  platform     String
-  url          String?
-  status       String          @default("PENDING")
-  version      String?
-  logs         String?
-  config       Json?
-  triggeredBy  String?
-  deploymentId String?
-  orgId        String?
-  org          Organization?   @relation(fields: [orgId], references: [id])
-  projectId    String?
-  project      Project?        @relation(fields: [projectId], references: [id])
-  deployedAt   DateTime        @default(now())
-  createdAt    DateTime        @default(now())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  agent       Agent?   @relation(fields: [agentId], references: [id])
 }
 
 // ============ ARTIFACTS ============
@@ -186,8 +203,9 @@ model Artifact {
   filePath  String?
   language  String?
   projectId String
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 // ============ CONVERSATIONS ============
@@ -195,6 +213,96 @@ model Artifact {
 model Conversation {
   id        String   @id @default(cuid())
   projectId String
+  message   String
+  role      String   @default("user")
+  createdAt DateTime @default(now())
+
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+// ============ REFRESH TOKENS ============
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  revoked   Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============ WORKFLOWS ============
+
+model Workflow {
+  id          String          @id @default(cuid())
+  name        String
+  description String
+  status      WorkflowStatus  @default(PENDING)
+  tasks       Json
+  dependencies Json
+  result      Json?
+  projectId   String?
+  project     Project?        @relation(fields: [projectId], references: [id])
+  userId      String?
+  user        User?           @relation(fields: [userId], references: [id])
+  createdAt   DateTime        @default(now())
+  completedAt DateTime?
+}
+
+enum WorkflowStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+// ============ DEPLOYMENTS ============
+
+model Deployment {
+  id           String   @id @default(cuid())
+  environment  String
+  platform     String
+  url          String?
+  status       String   @default("PENDING")
+  version      String
+  config       Json?
+  deploymentId String?
+  triggeredBy  String?
+  logs         String?
+  organizationId String?
+  org          Organization? @relation(fields: [organizationId], references: [id])
+  projectId    String?
+  project      Project? @relation(fields: [projectId], references: [id])
+  createdAt    DateTime @default(now())
+}
+
+// ============ NOTIFICATIONS ============
+
+model Notification {
+  id        String    @id @default(cuid())
+  type      String
+  title     String
+  message   String
+  priority  String    @default("normal")
+  data      Json?
+  read      Boolean   @default(false)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+}
+
+// ============ AUDIT LOGS ============
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  details   String
+  ipAddress String?
+  metadata  Json?
   createdAt DateTime @default(now())
 }
