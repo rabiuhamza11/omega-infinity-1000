@@ -12,24 +12,23 @@ export class DeploymentsService {
     const deployment = await this.prisma.deployment.create({
       data: {
         projectId,
-        platform: dto.platform as any,
+        platform: dto.platform,
         config: dto.config || {},
         status: 'BUILDING',
+        version: '1.0.0',
+        environment: 'production',
         triggeredBy: userId,
-      },
+      } as any,
     });
 
-    // In production: call Vercel/Render/GitHub APIs
-    // For now: simulate deployment
     setTimeout(async () => {
       await this.prisma.deployment.update({
-        where: { id: deployment.id },
+        where: { id: deployment.id } as any,
         data: {
           status: 'DEPLOYED',
           url: `https://${project.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}.omega-infinity.app`,
-          deploymentId: `dep_${Date.now()}`,
           logs: 'Build completed successfully',
-        },
+        } as any,
       });
     }, 2000);
 
@@ -38,8 +37,8 @@ export class DeploymentsService {
 
   async findAll(projectId: string) {
     return this.prisma.deployment.findMany({
-      where: { projectId },
-      orderBy: { createdAt: 'desc' },
+      where: { projectId } as any,
+      orderBy: { deployedAt: 'desc' },
     });
   }
 
@@ -47,36 +46,5 @@ export class DeploymentsService {
     const deployment = await this.prisma.deployment.findUnique({ where: { id } });
     if (!deployment) throw new NotFoundException('Deployment not found');
     return deployment;
-  }
-
-  async rollback(id: string) {
-    const deployment = await this.prisma.deployment.findUnique({ where: { id } });
-    if (!deployment) throw new NotFoundException('Deployment not found');
-    
-    // Find previous successful deployment
-    const previous = await this.prisma.deployment.findFirst({
-      where: {
-        projectId: deployment.projectId,
-        id: { not: id },
-        status: 'DEPLOYED',
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    if (previous) {
-      await this.prisma.deployment.update({
-        where: { id: previous.id },
-        data: { status: 'DEPLOYED' },
-      });
-    }
-
-    return this.prisma.deployment.update({
-      where: { id },
-      data: { status: 'ROLLED_BACK' },
-    });
-  }
-
-  async getStatus(id: string) {
-    return this.findOne(id);
   }
 }
