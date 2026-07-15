@@ -68,25 +68,25 @@ export class ProjectsService {
     return { message: 'Project deleted' };
   }
 
-  async addArtifact(userId: string, projectId: string, dto: { name: string; type: string; url: string }) {
-    await this.findOne(userId, projectId);
-    const artifact = await this.prisma.task.create({
+  async addArtifact(userId: string, projectId: string, dto: { name: string; type: string; content: string; filePath?: string; language?: string }) {
+    const project = await this.findOne(userId, projectId);
+    // Store artifact as a task with special type
+    return this.prisma.task.create({
       data: {
         title: dto.name,
         description: dto.type,
         projectId,
-        input: { type: dto.type, url: dto.url } as any,
+        input: { content: dto.content, filePath: dto.filePath, language: dto.language } as any,
         status: 'COMPLETED',
       } as any,
     });
-    return { id: artifact.id, name: dto.name, type: dto.type, url: dto.url, message: 'Artifact added' };
   }
 
   async getArtifacts(userId: string, projectId: string) {
     await this.findOne(userId, projectId);
     return this.prisma.task.findMany({
       where: { projectId, status: 'COMPLETED' } as any,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: 'desc' } as any,
     });
   }
 }
