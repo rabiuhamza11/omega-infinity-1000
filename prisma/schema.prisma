@@ -25,6 +25,7 @@ model User {
   updatedAt    DateTime   @updatedAt
 
   orgMembers   OrgMember[]
+  organizations Organization[] @relation("OrgOwner")
   projects     Project[]  @relation("ProjectOwner")
   agents       Agent[]
   workflows    Workflow[]
@@ -56,7 +57,7 @@ model Organization {
   updatedAt   DateTime   @updatedAt
 
   ownerId     String
-  owner       User       @relation(fields: [ownerId], references: [id])
+  owner       User       @relation("OrgOwner", fields: [ownerId], references: [id])
 
   members     OrgMember[]
   projects    Project[]
