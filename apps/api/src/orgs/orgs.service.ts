@@ -50,4 +50,37 @@ export class OrgsService {
     await this.findOne(userId, orgId);
     return this.prisma.organization.delete({ where: { id: orgId } });
   }
+
+  async invite(userId: string, orgId: string, email: string, role?: string) {
+    const org = await this.findOne(userId, orgId);
+    const inviter = (org as any).members?.find((m: any) => m.userId === userId);
+    if (!inviter || (inviter.role !== 'OWNER' && inviter.role !== 'ADMIN')) {
+      throw new ForbiddenException('Only owners and admins can invite');
+    }
+
+    const invitee = await this.prisma.user.findUnique({ where: { email } });
+    if (!invitee) throw new NotFoundException('User not found');
+
+    const existing = await this.prisma.orgMember.findUnique({
+      where: { orgId_userId: { orgId, userId: invitee.id } } as any,
+    });
+    if (existing) throw new ConflictException('User already a member');
+
+    return this.prisma.orgMember.create({
+      data: { orgId, userId: invitee.id, role: (role || 'DEVELOPER') as any } as any,
+    });
+  }
+
+  async updateRole(userId: string, orgId: string, memberUserId: string, role: string) {
+    const org = await this.findOne(userId, orgId);
+    const requester = (org as any).members?.find((m: any) => m.userId === userId);
+    if (!requester || requester.role !== 'OWNER') {
+      throw new ForbiddenException('Only owners can change roles');
+    }
+
+    return this.prisma.orgMember.update({
+      where: { orgId_userId: { orgId, userId: memberUserId } } as any,
+      data: { role: role as any },
+    });
+  }
 }
