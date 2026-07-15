@@ -47,4 +47,18 @@ export class DeploymentsService {
     if (!deployment) throw new NotFoundException('Deployment not found');
     return deployment;
   }
+
+  async getStatus(id: string) {
+    const deployment = await this.findOne(id);
+    return { id: deployment.id, status: deployment.status, url: deployment.url };
+  }
+
+  async rollback(id: string) {
+    const deployment = await this.findOne(id);
+    await this.prisma.deployment.update({
+      where: { id },
+      data: { status: 'ROLLED_BACK' } as any,
+    });
+    return { id: deployment.id, status: 'ROLLED_BACK', message: 'Deployment rolled back' };
+  }
 }
