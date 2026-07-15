@@ -77,8 +77,16 @@ model OrgMember {
   @@unique([orgId, userId])
 }
 
-enum OrgStatus { ACTIVE SUSPENDED }
-enum OrgRole { OWNER ADMIN DEVELOPER VIEWER }
+enum OrgStatus {
+  ACTIVE
+  SUSPENDED
+}
+enum OrgRole {
+  OWNER
+  ADMIN
+  DEVELOPER
+  VIEWER
+}
 
 // ============ PROJECTS ============
 
