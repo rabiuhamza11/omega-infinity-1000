@@ -13,24 +13,29 @@ datasource db {
 // ============ USERS & AUTH ============
 
 model User {
-  id           String     @id @default(cuid())
-  email        String     @unique
-  password     String
-  name         String
-  avatar       String?
-  role         UserRole   @default(DEVELOPER)
-  status       UserStatus @default(ACTIVE)
-  lastLogin    DateTime?
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id                  String     @id @default(cuid())
+  email               String     @unique
+  passwordHash        String
+  name                String
+  avatar              String?
+  role                UserRole   @default(DEVELOPER)
+  status              UserStatus @default(ACTIVE)
+  emailVerified       Boolean    @default(false)
+  emailVerifyToken    String?
+  passwordResetToken  String?
+  passwordResetExpires DateTime?
+  lastLogin           DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
 
-  orgMembers   OrgMember[]
+  orgMembers    OrgMember[]
   organizations Organization[] @relation("OrgOwner")
-  projects     Project[]  @relation("ProjectOwner")
-  agents       Agent[]
-  workflows    Workflow[]
-  notifications Notification[]
-  auditLogs    AuditLog[]
+  projects      Project[]     @relation("ProjectOwner")
+  agents        Agent[]
+  workflows     Workflow[]
+  notifications  Notification[]
+  auditLogs     AuditLog[]
+  refreshTokens RefreshToken[]
 }
 
 enum UserRole {
@@ -43,6 +48,18 @@ enum UserStatus {
   ACTIVE
   SUSPENDED
   PENDING
+}
+
+// ============ REFRESH TOKENS ============
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now())
 }
 
 // ============ ORGANIZATIONS ============
@@ -111,6 +128,7 @@ model Project {
 
   workflows   Workflow[]
   deployments Deployment[]
+  tasks       Task[]
 }
 
 enum ProjectStatus {
@@ -129,7 +147,7 @@ model Agent {
   type        AgentType
   description String
   capabilities String[]
-  isActive    Boolean    @default(true)
+  enabled     Boolean    @default(true)
   config      Json?
   orgId       String?
   org         Organization? @relation(fields: [orgId], references: [id])
@@ -137,6 +155,8 @@ model Agent {
   owner       User?      @relation(fields: [ownerId], references: [id])
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+
+  tasks       Task[]
 }
 
 enum AgentType {
@@ -150,6 +170,26 @@ enum AgentType {
   FRONTEND
   API
   ORCHESTRATOR
+}
+
+// ============ TASKS ============
+
+model Task {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id])
+  agentId     String?
+  agent       Agent?   @relation(fields: [agentId], references: [id])
+  input       Json?
+  output      Json?
+  result      String?
+  priority    Int      @default(5)
+  status      String   @default("QUEUED")
+  createdAt   DateTime @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
 }
 
 // ============ WORKFLOWS ============
