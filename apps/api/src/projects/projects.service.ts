@@ -10,8 +10,9 @@ export class ProjectsService {
       data: {
         name: dto.name,
         description: dto.description || '',
-        ownerId: userId,
-        orgId: dto.organizationId,
+        prompt: dto.prompt,
+        userId,
+        organizationId: dto.organizationId,
       } as any,
     });
   }
@@ -19,7 +20,7 @@ export class ProjectsService {
   async findAll(userId: string, query: { page?: number; limit?: number; status?: string }) {
     const page = query.page || 1;
     const limit = Math.min(query.limit || 20, 100);
-    const where: any = { ownerId: userId };
+    const where: any = { userId };
     if (query.status) where.status = query.status;
 
     const [items, total] = await Promise.all([
@@ -42,17 +43,17 @@ export class ProjectsService {
   async findOne(userId: string, id: string) {
     const project = await this.prisma.project.findUnique({
       where: { id },
-      include: { tasks: true, deployments: true } as any,
+      include: { tasks: true, deployments: true, artifacts: true, conversations: true } as any,
     });
     if (!project) throw new NotFoundException('Project not found');
-    if ((project as any).ownerId !== userId) throw new ForbiddenException('Access denied');
+    if ((project as any).userId !== userId) throw new ForbiddenException('Access denied');
     return project;
   }
 
   async update(userId: string, id: string, dto: Partial<{ name: string; description: string; status: string; prompt: string }>) {
     const project = await this.prisma.project.findUnique({ where: { id } });
     if (!project) throw new NotFoundException('Project not found');
-    if ((project as any).ownerId !== userId) throw new ForbiddenException('Access denied');
+    if ((project as any).userId !== userId) throw new ForbiddenException('Access denied');
     return this.prisma.project.update({ where: { id }, data: dto as any });
   }
 
@@ -63,30 +64,19 @@ export class ProjectsService {
   async remove(userId: string, id: string) {
     const project = await this.prisma.project.findUnique({ where: { id } });
     if (!project) throw new NotFoundException('Project not found');
-    if ((project as any).ownerId !== userId) throw new ForbiddenException('Access denied');
+    if ((project as any).userId !== userId) throw new ForbiddenException('Access denied');
     await this.prisma.project.delete({ where: { id } });
     return { message: 'Project deleted' };
   }
 
   async addArtifact(userId: string, projectId: string, dto: { name: string; type: string; content: string; filePath?: string; language?: string }) {
-    const project = await this.findOne(userId, projectId);
-    // Store artifact as a task with special type
-    return this.prisma.task.create({
-      data: {
-        title: dto.name,
-        description: dto.type,
-        projectId,
-        input: { content: dto.content, filePath: dto.filePath, language: dto.language } as any,
-        status: 'COMPLETED',
-      } as any,
-    });
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+    if (!project) throw new NotFoundException('Project not found');
+    if ((project as any).userId !== userId) throw new ForbiddenException('Access denied');
+    return this.prisma.artifact.create({ data: { ...dto, projectId } as any });
   }
 
   async getArtifacts(userId: string, projectId: string) {
-    await this.findOne(userId, projectId);
-    return this.prisma.task.findMany({
-      where: { projectId, status: 'COMPLETED' } as any,
-      orderBy: { createdAt: 'desc' } as any,
-    });
+    return this.prisma.artifact.findMany({ where: { projectId }, orderBy: { createdAt: 'desc' } });
   }
 }
