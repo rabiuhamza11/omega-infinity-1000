@@ -61,6 +61,11 @@ jobs:
       - name: Install
         run: npm install --legacy-peer-deps
 
+      - name: Generate Prisma client
+        run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://postgresql://localhost:5432/omega
+
       - name: Build
         run: npm run build
         env:
