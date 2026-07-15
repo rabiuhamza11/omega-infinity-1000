@@ -13,11 +13,9 @@ export class DeploymentsService {
       data: {
         projectId,
         platform: dto.platform,
-        config: dto.config || {},
+        environment: 'production',
         status: 'BUILDING',
         version: '1.0.0',
-        environment: 'production',
-        triggeredBy: userId,
       } as any,
     });
 
