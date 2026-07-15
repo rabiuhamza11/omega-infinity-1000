@@ -20,7 +20,7 @@ model User {
   avatarUrl           String?
   role                UserRole   @default(DEVELOPER)
   status              UserStatus @default(ACTIVE)
-  emailVerified       DateTime?
+  emailVerified       Boolean    @default(false)
   emailVerifyToken    String?    @unique
   passwordResetToken  String?
   passwordResetExpires DateTime?
@@ -62,8 +62,8 @@ model Organization {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  ownerId     String
-  owner       User       @relation("OrgOwner", fields: [ownerId], references: [id])
+  ownerId     String?
+  owner       User?      @relation("OrgOwner", fields: [ownerId], references: [id])
 
   memberships Membership[]
   projects    Project[]
@@ -111,7 +111,7 @@ model Project {
   name           String
   description    String
   prompt         String?
-  status         ProjectStatus  @default(PLANNING)
+  status         String  @default("PLANNING")
   techStack      String[]
   progress       Int            @default(0)
   repoUrl        String?
@@ -131,21 +131,13 @@ model Project {
   conversations Conversation[]
 }
 
-enum ProjectStatus {
-  PLANNING
-  ACTIVE
-  PAUSED
-  COMPLETED
-  ARCHIVED
-}
-
 // ============ AI AGENTS ============
 
 model Agent {
   id          String     @id @default(cuid())
   name        String
   type        AgentType
-  description String
+  description String?
   capabilities String[]
   enabled     Boolean    @default(true)
   config      Json?
@@ -263,11 +255,11 @@ enum WorkflowStatus {
 
 model Deployment {
   id           String   @id @default(cuid())
-  environment  String
+  environment  String?
   platform     String
   url          String?
   status       String   @default("PENDING")
-  version      String
+  version      String?
   config       Json?
   deploymentId String?
   triggeredBy  String?
