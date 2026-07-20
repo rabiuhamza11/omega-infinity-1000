@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Zap, User, Mail, Lock, ArrowRight, Check } from 'lucide-react';
+import { authApi } from '@/lib/api';
+import { useStore } from '@/lib/store';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -9,6 +11,8 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+
+  const setAuth = useStore((s) => s.setAuth);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,11 +32,12 @@ export default function RegisterPage() {
     }
 
     try {
-      await new Promise((r) => setTimeout(r, 1500));
+      const { data } = await authApi.register({ name: form.name, email: form.email, password: form.password });
+      setAuth(data.user, data.accessToken, data.refreshToken);
       setSuccess(true);
-      setTimeout(() => router.push('/'), 2000);
+      setTimeout(() => router.push('/dashboard'), 1500);
     } catch (err: any) {
-      setError(err.message || 'Registration failed');
+      setError(err.response?.data?.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -46,7 +51,7 @@ export default function RegisterPage() {
             <Check size={32} className="text-white" />
           </div>
           <h2 className="text-2xl font-bold mb-2">Account Created!</h2>
-          <p className="text-white/40">Redirecting to login...</p>
+          <p className="text-white/40">Redirecting to dashboard...</p>
         </div>
       </div>
     );
@@ -55,7 +60,6 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-slate-900 to-black px-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-2">
             <div className="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center">
@@ -66,7 +70,6 @@ export default function RegisterPage() {
           <p className="text-white/40 text-sm mt-1">Create your account</p>
         </div>
 
-        {/* Register Card */}
         <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-8 border border-white/10">
           <form onSubmit={handleRegister} className="space-y-4">
             <div>
