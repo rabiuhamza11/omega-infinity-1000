@@ -77,20 +77,26 @@ export class AuthService {
     return { message: 'Logged out successfully' };
   }
 
+  async logoutAll(userId: string) {
+    await this.prisma.refreshToken.updateMany({
+      where: { userId, revoked: false },
+      data: { revoked: true },
+    });
+    return { message: 'All sessions revoked' };
+  }
+
   async requestPasswordReset(email: string) {
     const user = await this.prisma.user.findUnique({ where: { email } });
     if (!user) return { message: 'If the email exists, a reset link has been sent' };
 
     const token = uuidv4();
-    const expires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const expires = new Date(Date.now() + 60 * 60 * 1000);
 
     await this.prisma.user.update({
       where: { id: user.id },
       data: { passwordResetToken: token, passwordResetExpires: expires },
     });
 
-    // In production: send email with reset link
-    // For now: return token (should be sent via email service)
     return { message: 'Password reset link sent', resetToken: token };
   }
 
@@ -106,7 +112,6 @@ export class AuthService {
       data: { passwordHash, passwordResetToken: null, passwordResetExpires: null },
     });
 
-    // Revoke all refresh tokens
     await this.prisma.refreshToken.updateMany({
       where: { userId: user.id, revoked: false },
       data: { revoked: true },
@@ -133,7 +138,7 @@ export class AuthService {
 
   private async generateRefreshToken(userId: string): Promise<string> {
     const token = uuidv4();
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+    const expiresAt = new Date(Date.now() + 90 * 24 * 60 * 60 * 1000); // 90 days
 
     await this.prisma.refreshToken.create({
       data: { token, userId, expiresAt },

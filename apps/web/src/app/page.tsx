@@ -1,7 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Zap, Mail, Lock, ArrowRight, Github } from 'lucide-react';
+import { authApi } from '@/lib/api';
+import { useStore } from '@/lib/store';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -10,18 +12,26 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const setAuth = useStore((s) => s.setAuth);
+  const restoreSession = useStore((s) => s.restoreSession);
+  const isAuthenticated = useStore((s) => s.isAuthenticated);
+
+  useEffect(() => {
+    restoreSession();
+    if (isAuthenticated) router.push('/dashboard');
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
     try {
-      // In production: call API
-      await new Promise((r) => setTimeout(r, 1000));
-      localStorage.setItem('omega_token', 'demo-jwt-token');
+      const { data } = await authApi.login(email, password);
+      setAuth(data.user, data.accessToken, data.refreshToken);
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Login failed');
+      setError(err.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);
     }
@@ -30,7 +40,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-900 via-slate-900 to-black px-4">
       <div className="w-full max-w-md">
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-2">
             <div className="w-12 h-12 rounded-xl bg-purple-600 flex items-center justify-center">
@@ -41,7 +50,6 @@ export default function LoginPage() {
           <p className="text-white/40 text-sm mt-1">AI-Powered Software Factory</p>
         </div>
 
-        {/* Login Card */}
         <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-8 border border-white/10">
           <h2 className="text-xl font-semibold mb-6">Sign in to your account</h2>
 
@@ -83,14 +91,12 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Divider */}
           <div className="my-6 flex items-center gap-3">
             <div className="flex-1 h-px bg-white/10" />
             <span className="text-xs text-white/30">OR</span>
             <div className="flex-1 h-px bg-white/10" />
           </div>
 
-          {/* OAuth */}
           <button className="w-full p-3 rounded-lg bg-white/5 hover:bg-white/10 transition flex items-center justify-center gap-2 text-sm">
             <Github size={18} /> Continue with GitHub
           </button>
@@ -100,10 +106,6 @@ export default function LoginPage() {
             <a href="/register" className="text-purple-400 hover:underline">Sign up</a>
           </p>
         </div>
-
-        <p className="text-center text-xs text-white/20 mt-4">
-          Demo: admin@omegainfinity.io / admin123456
-        </p>
       </div>
     </div>
   );

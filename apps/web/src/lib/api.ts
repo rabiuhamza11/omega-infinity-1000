@@ -15,13 +15,60 @@ client.interceptors.request.use((config) => {
   return config;
 });
 
+// Track refresh state to prevent concurrent refresh calls
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  if (isRefreshing && refreshPromise) return refreshPromise;
+
+  const refreshToken = localStorage.getItem('omega_refresh_token');
+  if (!refreshToken) return null;
+
+  isRefreshing = true;
+  refreshPromise = (async () => {
+    try {
+      const res = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+      if (res.data?.accessToken) {
+        localStorage.setItem('omega_token', res.data.accessToken);
+        if (res.data?.refreshToken) {
+          localStorage.setItem('omega_refresh_token', res.data.refreshToken);
+        }
+        return res.data.accessToken;
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      isRefreshing = false;
+    }
+  })();
+
+  return refreshPromise;
+}
+
 client.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401 && typeof window !== 'undefined') {
+  async (error) => {
+    const originalRequest = error.config;
+
+    if (error.response?.status === 401 && typeof window !== 'undefined' && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return client(originalRequest);
+      }
+
+      // Refresh failed — clear everything and redirect
       localStorage.removeItem('omega_token');
+      localStorage.removeItem('omega_refresh_token');
+      localStorage.removeItem('omega_user');
       window.location.href = '/';
     }
+
     return Promise.reject(error);
   }
 );
@@ -29,8 +76,31 @@ client.interceptors.response.use(
 // ============ AUTH ============
 
 export const authApi = {
-  login: (email: string, password: string) => client.post('/auth/login', { email, password }),
-  register: (data: { name: string; email: string; password: string }) => client.post('/auth/register', data),
+  login: async (email: string, password: string) => {
+    const res = await client.post('/auth/login', { email, password });
+    if (res.data?.accessToken) localStorage.setItem('omega_token', res.data.accessToken);
+    if (res.data?.refreshToken) localStorage.setItem('omega_refresh_token', res.data.refreshToken);
+    if (res.data?.user) localStorage.setItem('omega_user', JSON.stringify(res.data.user));
+    return res;
+  },
+  register: async (data: { name: string; email: string; password: string }) => {
+    const res = await client.post('/auth/register', data);
+    if (res.data?.accessToken) localStorage.setItem('omega_token', res.data.accessToken);
+    if (res.data?.refreshToken) localStorage.setItem('omega_refresh_token', res.data.refreshToken);
+    if (res.data?.user) localStorage.setItem('omega_user', JSON.stringify(res.data.user));
+    return res;
+  },
+  logout: async () => {
+    const refreshToken = typeof window !== 'undefined' ? localStorage.getItem('omega_refresh_token') : null;
+    try {
+      if (refreshToken) await client.post('/auth/logout', { refreshToken });
+    } catch { /* ignore */ }
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('omega_token');
+      localStorage.removeItem('omega_refresh_token');
+      localStorage.removeItem('omega_user');
+    }
+  },
   me: () => client.get('/auth/me'),
   refreshToken: () => client.post('/auth/refresh'),
 };
